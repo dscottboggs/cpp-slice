@@ -69,3 +69,38 @@ TEST_CASE("double each value of a mutable Slice") {
   for (i = 0; i < 10; ++i)
     REQUIRE(intBuf[i] == (i * 2));
 }
+
+TEST_CASE("Slice::operator[] with negative index") {
+  int intBuf[3] = { 0, 1, 2 };
+  slice::Slice ints(intBuf, 3);
+  try {
+    REQUIRE(ints[-1] == 2);
+  }
+  catch (slice::Slice<int>::OutOfBounds* error) {
+    FAIL(error->what());
+  }
+  // fuck wrap-around
+  REQUIRE_THROWS_AS(ints[-4], slice::Slice<int>::OutOfBounds*);
+}
+TEST_CASE("Slice::operator==") {
+  int bufA[2] = { 0, 1 };
+  int bufB[2] = { 0, 1 };
+  slice::Slice a(bufA, 2);
+  slice::Slice b(bufB, 2);
+  REQUIRE(a.ptr() != b.ptr());
+  REQUIRE(a == b);
+  *a = 2;
+  REQUIRE(a != b);
+}
+
+TEST_CASE("Slice::operator&") {
+  int buf[2] = { 0, 1 };
+  slice::Slice s(buf, 2);
+  REQUIRE(s.ptr() == *&s);
+}
+
+TEST_CASE("Out of bounds check") {
+  int buf[2] = { 0, 1 };
+  slice::Slice s(buf, 2);
+  REQUIRE_THROWS_AS(s[2], slice::Slice<int>::OutOfBounds*);
+}
