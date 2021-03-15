@@ -59,7 +59,7 @@ TEST_CASE("double each value of a mutable Slice") {
   for (int i = 0; i < 10; ++i)
     intBuf[i] = i;
   // take a slice of that buffer
-  slice::Slice<int> intSlice(intBuf, 10);
+  slice::Slice<int> intSlice(&*intBuf, size_t(10));
   for (auto& v : intSlice)
     v *= 2;
   int i = 0;
@@ -68,4 +68,9 @@ TEST_CASE("double each value of a mutable Slice") {
   // also, the original buffer reflects the changes
   for (i = 0; i < 10; ++i)
     REQUIRE(intBuf[i] == (i * 2));
+}
+
+TEST_CASE("Slice::operator[] with negative index") {
+  int intBuf[3] = { 0, 1, 2 };
+
 }

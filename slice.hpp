@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <utility>
 #include <functional>
+#include <cstring>
 
 namespace slice {
   using std::get;
@@ -34,22 +35,51 @@ namespace slice {
       size_t length() const noexcept { return _length; }
     };
     // constructors
-    explicit Slice(typename std::enable_if<not owned, T>* ptr, size_t size) : _ptr(ptr), _length(size) {}
-    explicit Slice(typename std::enable_if<owned, T> value, size_t size) : _ptr(new T[size]), _length(size) {
-      for (size_t i = 0; i < _length; ++i) _ptr[i] = value;
+    explicit Slice(
+      typename std::enable_if<not owned, T>* ptr,
+      size_t size
+    ) : _ptr(ptr), _length(size) {}
+
+    // Explicitly specify a default value
+    explicit Slice(
+      typename std::enable_if<owned, size_t> size,
+      T value
+    ) : _ptr(new T[size * sizeof(T)]), _length(size) {
+      for (T& it : *this) it = value;
     }
+
+    // optimization for byte-slices
+    explicit Slice(
+      typename std::enable_if<std::is_same<T, unsigned char>() and owned, size_t> size,
+      T value
+    ) : _ptr(new T[size * sizeof(T)]), _length(size) {
+      std::memset(_ptr, value, size * sizeof(T));
+    }
+
+
+    // Zero-initialized numeric buffer
+    explicit Slice(
+      typename std::enable_if<std::is_arithmetic<T>() and owned, size_t> size
+    ) :_ptr(new T[size * sizeof(T)], _length(size)) {
+      std::memset(_ptr, 0, size);
+    }
+
+    // initialize each value by calling the given callback and passing the index
     explicit Slice(
       typename std::enable_if<owned, size_t> size,
       std::function<T(size_t)> builder
-    ) : _ptr(new T[size], _length(size)) {
-      for (size_t i = 0; i < _length; ++i)
-        _ptr[i] = builder(i);
+    ) : _ptr(new T[size * sizeof(T)], _length(size)) {
+      for (T& it : *this) it = builder(i);
+    }
+
+    explicit Slice(
+      typename std::enable_if<std::is_trivially_default_constructible<T>, size_t> size
+    ) : _ptr(new T[size * sizeof(T)], _length(size)) {
+      for (T& it : *this) it = T();
     }
 
     Slice(Slice<T>&) = default;
-    Slice& operator=(Slice& it) {
-      return { it._ptr, it._length };
-    }
+    Slice& operator=(Slice& it) { return it; }
     Slice(Slice&&) = default;
 
     // destructor
@@ -70,7 +100,7 @@ namespace slice {
     Slice<T> slice(size_t start, size_t end) const {
       while (end < 0)
         end = _length + end;
-      if ((end - start) > _length) throw new OutOfBounds(end - start, _length - start);
+      if ((end - start) > (_length - start)) throw new OutOfBounds(end - start, _length - start);
       return Slice<T>(_ptr + start, end - start);
     }
     Slice<T> sliceFrom(size_t offset) const {
